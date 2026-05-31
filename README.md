@@ -172,6 +172,18 @@ You can also exercise the server by hand with the official
 npx @modelcontextprotocol/inspector node dist/index.js
 ```
 
+To smoke-test every tool against a **real** booted simulator (boots an iPhone,
+overrides the status bar, switches to dark mode, opens a URL, and saves a
+screenshot to `/tmp/sim-e2e.png`):
+
+```bash
+npm run build
+node scripts/e2e.mjs
+```
+
+The automated `npm test` suite mocks `xcrun`, so this script is the way to catch
+issues that only surface against the actual `simctl` binary.
+
 ## Troubleshooting
 
 - **"No simulator found matching ..."** — run `list_devices` (or `xcrun simctl list
