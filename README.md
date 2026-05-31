@@ -184,6 +184,16 @@ node scripts/e2e.mjs
 The automated `npm test` suite mocks `xcrun`, so this script is the way to catch
 issues that only surface against the actual `simctl` binary.
 
+For a hands-off, never-ending demo (handy for screen recordings), `scripts/demo.mjs`
+boots a simulator and then loops until you Ctrl-C: every 10s it browses to one of
+20 well-known sites, and on a 5s offset it tweaks something else (dark/light mode,
+status-bar overrides, scrolling).
+
+```bash
+npm run build
+node scripts/demo.mjs            # or: node scripts/demo.mjs "iPhone 16 Pro"
+```
+
 ## Troubleshooting
 
 - **"No simulator found matching ..."** — run `list_devices` (or `xcrun simctl list
