@@ -47,7 +47,9 @@ interface SimDeviceList {
 
 /** True if a string already looks like a simulator UDID. */
 export function isUdid(value: string): boolean {
-  return /^[0-9A-F-]{36}$/i.test(value);
+  return /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i.test(
+    value,
+  );
 }
 
 /**

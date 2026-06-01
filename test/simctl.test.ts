@@ -52,6 +52,20 @@ test("isUdid recognizes a 36-char UDID and rejects names", () => {
   assert.equal(isUdid("booted"), false);
 });
 
+test("isUdid rejects 36-char near-misses that aren't the 8-4-4-4-12 shape", () => {
+  // Right length, dashes in the wrong places.
+  assert.equal(isUdid("AAAAAAAAB-BBB-CCCC-DDDD-EEEEEEEEEEEE"), false);
+  assert.equal(isUdid("-AAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE"), false);
+  assert.equal(isUdid("AAAAAAAA-BBBBCCCC-DDDD-EEEE-FFFFFFFFFF"), false);
+  // 36 chars of all dashes — matched by the old loose regex.
+  assert.equal(isUdid("------------------------------------"), false);
+  // Non-hex character in an otherwise well-shaped UDID.
+  assert.equal(isUdid("GGGGGGGG-BBBB-CCCC-DDDD-EEEEEEEEEEEE"), false);
+  // Correct shape but wrong length.
+  assert.equal(isUdid("AAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE"), false);
+  assert.equal(isUdid("AAAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE"), false);
+});
+
 // ── resolveDevice ─────────────────────────────────────────────────────────────
 
 test("resolveDevice passes 'booted' through without shelling out", () => {
