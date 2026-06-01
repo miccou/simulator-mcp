@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   buildStatusBarArgs,
+  debugEnabled,
   formatDeviceList,
   isUdid,
   resolveDevice,
+  withDebugLogging,
   type Runner,
 } from "../src/simctl.js";
 
@@ -190,4 +192,57 @@ test("formatDeviceList skips runtimes with no available devices", () => {
     },
   });
   assert.equal(formatDeviceList(raw), "");
+});
+
+// ── debugEnabled ──────────────────────────────────────────────────────────────
+
+test("debugEnabled is off when the env var is unset, empty, '0', or 'false'", () => {
+  assert.equal(debugEnabled({}), false);
+  assert.equal(debugEnabled({ SIMULATOR_MCP_DEBUG: "" }), false);
+  assert.equal(debugEnabled({ SIMULATOR_MCP_DEBUG: "0" }), false);
+  assert.equal(debugEnabled({ SIMULATOR_MCP_DEBUG: "false" }), false);
+  assert.equal(debugEnabled({ SIMULATOR_MCP_DEBUG: "FALSE" }), false);
+});
+
+test("debugEnabled is on for '1', 'true', or any other value", () => {
+  assert.equal(debugEnabled({ SIMULATOR_MCP_DEBUG: "1" }), true);
+  assert.equal(debugEnabled({ SIMULATOR_MCP_DEBUG: "true" }), true);
+  assert.equal(debugEnabled({ SIMULATOR_MCP_DEBUG: "yes" }), true);
+});
+
+// ── withDebugLogging ──────────────────────────────────────────────────────────
+
+test("withDebugLogging returns the runner untouched when disabled", () => {
+  const run = fakeRunner("out");
+  const wrapped = withDebugLogging(run, () => {}, false);
+  assert.equal(wrapped, run); // same reference: zero overhead
+});
+
+test("withDebugLogging logs the command and its success, passing output through", () => {
+  const logs: string[] = [];
+  const run = fakeRunner("device-list");
+  const wrapped = withDebugLogging(run, (m) => logs.push(m), true);
+
+  const out = wrapped(["simctl", "list", "devices", "--json"]);
+
+  assert.equal(out, "device-list"); // stdout still returned
+  assert.deepEqual(run.calls[0], ["simctl", "list", "devices", "--json"]);
+  assert.equal(logs.length, 2);
+  assert.match(logs[0], /→ xcrun simctl list devices --json/);
+  assert.match(logs[1], /✓ xcrun simctl list devices --json/);
+});
+
+test("withDebugLogging logs the error message and re-throws", () => {
+  const logs: string[] = [];
+  const run: Runner = () => {
+    throw new Error("Unknown subcommand 'status_bar'");
+  };
+  const wrapped = withDebugLogging(run, (m) => logs.push(m), true);
+
+  assert.throws(
+    () => wrapped(["simctl", "status_bar", "booted", "clear"]),
+    /Unknown subcommand/,
+  );
+  assert.match(logs[0], /→ xcrun simctl status_bar booted clear/);
+  assert.match(logs[1], /✗ xcrun simctl status_bar booted clear — Unknown subcommand/);
 });

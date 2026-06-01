@@ -204,6 +204,25 @@ node scripts/demo.mjs            # or: node scripts/demo.mjs "iPhone 16 Pro"
   `xcode-select --install`.
 - **`tap` / `swipe` do nothing** — these require a booted device and a foreground
   app that accepts the input; take a `screenshot` first to confirm coordinates.
+- **A command misbehaves and you want to see exactly what ran** — set
+  `SIMULATOR_MCP_DEBUG=1` to log every issued `xcrun` command and its outcome to
+  stderr. This is safe for the stdio transport (stderr never touches the protocol
+  on stdout). Add it to your MCP client config:
+
+  ```json
+  {
+    "mcpServers": {
+      "ios-simulator": {
+        "command": "npx",
+        "args": ["-y", "simulator-mcp"],
+        "env": { "SIMULATOR_MCP_DEBUG": "1" }
+      }
+    }
+  }
+  ```
+
+  Each call logs as `[simulator-mcp] → xcrun simctl ...` followed by `✓` (success)
+  or `✗ ... — <error>` (failure).
 
 ## Contributing
 

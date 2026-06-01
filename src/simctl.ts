@@ -30,6 +30,49 @@ export const xcrun: Runner = (args) => {
 };
 
 // ---------------------------------------------------------------------------
+// Debug logging
+// ---------------------------------------------------------------------------
+
+/**
+ * True when opt-in command logging is requested via `SIMULATOR_MCP_DEBUG`.
+ * Any value except unset, empty, `"0"`, or `"false"` enables it.
+ */
+export function debugEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  const v = env.SIMULATOR_MCP_DEBUG;
+  return (
+    v !== undefined && v !== "" && v !== "0" && v.toLowerCase() !== "false"
+  );
+}
+
+/**
+ * Wraps a `Runner` so every issued command — and whether it succeeded or
+ * threw — is logged to `log` (stderr by default). stderr is safe for an stdio
+ * MCP server: it never touches the JSON-RPC stream on stdout. When logging is
+ * disabled the original runner is returned untouched, so there is zero
+ * overhead in the common case.
+ */
+export function withDebugLogging(
+  run: Runner,
+  log: (msg: string) => void = (m) => console.error(m),
+  enabled: boolean = debugEnabled(),
+): Runner {
+  if (!enabled) return run;
+  return (args) => {
+    const cmd = `xcrun ${args.join(" ")}`;
+    log(`[simulator-mcp] → ${cmd}`);
+    try {
+      const out = run(args);
+      log(`[simulator-mcp] ✓ ${cmd}`);
+      return out;
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      log(`[simulator-mcp] ✗ ${cmd} — ${message}`);
+      throw e;
+    }
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Device resolution
 // ---------------------------------------------------------------------------
 
