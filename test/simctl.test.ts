@@ -11,7 +11,7 @@ import {
 // A Runner that records the args it was called with and returns canned output.
 function fakeRunner(output = ""): Runner & { calls: string[][] } {
   const calls: string[][] = [];
-  const run = ((args: string[]) => {
+  const run = (async (args: string[]) => {
     calls.push(args);
     return output;
   }) as Runner & { calls: string[][] };
@@ -68,39 +68,39 @@ test("isUdid rejects 36-char near-misses that aren't the 8-4-4-4-12 shape", () =
 
 // ── resolveDevice ─────────────────────────────────────────────────────────────
 
-test("resolveDevice passes 'booted' through without shelling out", () => {
+test("resolveDevice passes 'booted' through without shelling out", async () => {
   const run = fakeRunner();
-  assert.equal(resolveDevice(run, "booted"), "booted");
+  assert.equal(await resolveDevice(run, "booted"), "booted");
   assert.equal(run.calls.length, 0);
 });
 
-test("resolveDevice passes a bare UDID through without shelling out", () => {
+test("resolveDevice passes a bare UDID through without shelling out", async () => {
   const run = fakeRunner();
   const udid = "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE";
-  assert.equal(resolveDevice(run, udid), udid);
+  assert.equal(await resolveDevice(run, udid), udid);
   assert.equal(run.calls.length, 0);
 });
 
-test("resolveDevice matches a device name case-insensitively", () => {
+test("resolveDevice matches a device name case-insensitively", async () => {
   const run = fakeRunner(DEVICE_JSON);
   assert.equal(
-    resolveDevice(run, "iphone 16 pro"),
+    await resolveDevice(run, "iphone 16 pro"),
     "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE",
   );
   assert.deepEqual(run.calls[0], ["simctl", "list", "devices", "--json"]);
 });
 
-test("resolveDevice skips unavailable devices", () => {
+test("resolveDevice skips unavailable devices", async () => {
   const run = fakeRunner(DEVICE_JSON);
-  assert.throws(
+  await assert.rejects(
     () => resolveDevice(run, "Old Unavailable"),
     /No simulator found matching "Old Unavailable"/,
   );
 });
 
-test("resolveDevice throws on an unknown name", () => {
+test("resolveDevice throws on an unknown name", async () => {
   const run = fakeRunner(DEVICE_JSON);
-  assert.throws(
+  await assert.rejects(
     () => resolveDevice(run, "Nonexistent"),
     /No simulator found matching "Nonexistent"/,
   );

@@ -34,7 +34,7 @@ async function connect(
   const calls: string[][] = [];
   let openAppCalls = 0;
 
-  const run = (args: string[]): string => {
+  const run = async (args: string[]): Promise<string> => {
     calls.push(args);
     if (args[1] === "list" && args[2] === "devices") return DEVICE_JSON;
     if (args.includes("screenshot")) {
