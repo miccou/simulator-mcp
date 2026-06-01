@@ -4,7 +4,6 @@
 // scroll). Optionally pass a device name: `node scripts/demo.mjs "iPhone 16 Pro"`.
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { execFileSync } from "node:child_process";
 
 const DEVICE = process.argv[2] ?? "iPhone 16";
 
@@ -90,8 +89,7 @@ const client = new Client({ name: "demo", version: "1.0.0" });
 await client.connect(transport);
 
 log(`booting ${DEVICE} …`);
-await client.callTool({ name: "boot", arguments: { device: DEVICE } });
-execFileSync("xcrun", ["simctl", "bootstatus", DEVICE, "-b"], { stdio: "ignore" });
+await client.callTool({ name: "boot", arguments: { device: DEVICE } }); // boot now waits for the device to be ready
 log("booted — starting demo loop (Ctrl-C to stop)");
 
 let urlIdx = Math.floor(Math.random() * URLS.length);

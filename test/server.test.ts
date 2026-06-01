@@ -219,6 +219,63 @@ test("boot resolves a name to a UDID and opens the Simulator app", async () => {
   assert.match((res.content as [{ text: string }])[0].text, /Booted/);
 });
 
+test("boot waits for the device to finish booting", async () => {
+  const harness = await connect();
+  await harness.client.callTool({
+    name: "boot",
+    arguments: { device: "iPhone 16 Pro" },
+  });
+
+  // The handler must block on `bootstatus -b` before returning, so callers
+  // don't drive a half-booted device.
+  const wait = harness.calls.find((c) => c[1] === "bootstatus");
+  assert.deepEqual(wait, [
+    "simctl",
+    "bootstatus",
+    "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE",
+    "-b",
+  ]);
+});
+
+test("boot treats an already-booted device as success", async () => {
+  const run = async (args: string[]): Promise<string> => {
+    if (args[1] === "list" && args[2] === "devices") return DEVICE_JSON;
+    if (args[1] === "boot") {
+      throw new Error("Unable to boot device in current state: Booted");
+    }
+    return "";
+  };
+  const { client } = await connect({ run });
+
+  const res = await client.callTool({
+    name: "boot",
+    arguments: { device: "iPhone 16 Pro" },
+  });
+
+  assert.notEqual(res.isError, true);
+  assert.match((res.content as [{ text: string }])[0].text, /Booted/);
+});
+
+test("boot surfaces a genuine boot failure", async () => {
+  const run = async (args: string[]): Promise<string> => {
+    if (args[1] === "list" && args[2] === "devices") return DEVICE_JSON;
+    if (args[1] === "boot") throw new Error("Invalid device state");
+    return "";
+  };
+  const { client } = await connect({ run });
+
+  const res = await client.callTool({
+    name: "boot",
+    arguments: { device: "iPhone 16 Pro" },
+  });
+
+  assert.equal(res.isError, true);
+  assert.match(
+    (res.content as [{ text: string }])[0].text,
+    /Invalid device state/,
+  );
+});
+
 // ── shutdown ────────────────────────────────────────────────────────────────
 
 test("shutdown targets the booted device by default", async () => {

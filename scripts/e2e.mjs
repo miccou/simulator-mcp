@@ -1,6 +1,5 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 
 const DEVICE = "iPhone 16";
@@ -23,11 +22,9 @@ const call = async (name, args = {}) => {
 };
 
 await call("list_devices");
+// boot now blocks until the device has finished booting, so the UI calls
+// below are safe to make immediately.
 await call("boot", { device: DEVICE });
-
-// Wait for the device to finish booting before driving the UI.
-console.log("\n… waiting for boot");
-execFileSync("xcrun", ["simctl", "bootstatus", DEVICE, "-b"], { stdio: "ignore" });
 
 await call("set_status_bar", {
   time: "9:41",

@@ -243,7 +243,9 @@ export function createServer(deps: ServerDeps = {}): McpServer {
     "boot",
     {
       description:
-        "Boot an iOS Simulator device by name or UDID and open the Simulator app.",
+        "Boot an iOS Simulator device by name or UDID and open the Simulator app. " +
+        "Blocks until the device has finished booting, so a follow-up " +
+        "screenshot or tap hits a ready device.",
       inputSchema: {
         device: z
           .string()
@@ -252,8 +254,18 @@ export function createServer(deps: ServerDeps = {}): McpServer {
     },
     async ({ device }) => {
       const udid = await resolveDevice(run, device);
-      await run(["simctl", "boot", udid]);
+      try {
+        await run(["simctl", "boot", udid]);
+      } catch (err) {
+        // Booting an already-booted device is a no-op, not a failure —
+        // swallow that case and let anything else surface.
+        const message = err instanceof Error ? err.message : String(err);
+        if (!/already booted|current state: Booted/i.test(message)) throw err;
+      }
       await openApp();
+      // Wait for the device to actually finish booting before returning;
+      // `simctl boot` exits long before the device is usable.
+      await run(["simctl", "bootstatus", udid, "-b"]);
       return {
         content: [{ type: "text", text: `Booted: ${device} (${udid})` }],
       };
