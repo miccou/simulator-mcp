@@ -1,26 +1,31 @@
-import { execFileSync } from "node:child_process";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
 
 // ---------------------------------------------------------------------------
 // Command runner
 // ---------------------------------------------------------------------------
 
 /**
- * Runs an `xcrun` subcommand and returns its trimmed stdout. Arguments are
- * always passed as an array (never interpolated into a shell string), so
+ * Runs an `xcrun` subcommand and resolves with its trimmed stdout. Arguments
+ * are always passed as an array (never interpolated into a shell string), so
  * device names, URLs, and status-bar values can't break out into shell
- * injection. Injecting a different `Runner` is how the tests drive the server
- * without a real simulator.
+ * injection. The call is async so it never blocks the Node event loop — even
+ * while a large screenshot or JSON payload is read off the pipe. Injecting a
+ * different `Runner` is how the tests drive the server without a real
+ * simulator.
  */
-export type Runner = (args: string[]) => string;
+export type Runner = (args: string[]) => Promise<string>;
 
 /** The real runner: shells out to `xcrun`. */
-export const xcrun: Runner = (args) => {
+export const xcrun: Runner = async (args) => {
   try {
-    return execFileSync("xcrun", args, {
+    const { stdout } = await execFileAsync("xcrun", args, {
       encoding: "utf8",
-      stdio: ["pipe", "pipe", "pipe"],
       maxBuffer: 64 * 1024 * 1024, // screenshots/JSON can be large
-    }).trim();
+    });
+    return stdout.trim();
   } catch (e: unknown) {
     const err = e as { stderr?: string; stdout?: string; message?: string };
     throw new Error(
@@ -55,12 +60,15 @@ export function isUdid(value: string): boolean {
  * `"booted"` and bare UDIDs pass straight through; names are matched
  * case-insensitively against available devices.
  */
-export function resolveDevice(run: Runner, nameOrUdid: string): string {
+export async function resolveDevice(
+  run: Runner,
+  nameOrUdid: string,
+): Promise<string> {
   if (nameOrUdid === "booted") return "booted";
   if (isUdid(nameOrUdid)) return nameOrUdid;
 
   const parsed = JSON.parse(
-    run(["simctl", "list", "devices", "--json"]),
+    await run(["simctl", "list", "devices", "--json"]),
   ) as SimDeviceList;
 
   for (const devices of Object.values(parsed.devices)) {

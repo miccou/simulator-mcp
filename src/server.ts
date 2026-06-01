@@ -1,9 +1,12 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, unlinkSync } from "node:fs";
+import { execFile } from "node:child_process";
+import { readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { promisify } from "node:util";
 import { z } from "zod";
+
+const execFileAsync = promisify(execFile);
 import {
   buildStatusBarArgs,
   formatDeviceList,
@@ -20,7 +23,7 @@ export interface ServerDeps {
   /** Runs an `xcrun` subcommand. Defaults to the real runner. */
   run?: Runner;
   /** Brings the Simulator app to the foreground (used by `boot`). */
-  openApp?: () => void;
+  openApp?: () => void | Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -52,8 +55,8 @@ export function createServer(deps: ServerDeps = {}): McpServer {
   const run = deps.run ?? xcrun;
   const openApp =
     deps.openApp ??
-    (() => {
-      execFileSync("open", ["-a", "Simulator"], { stdio: "ignore" });
+    (async () => {
+      await execFileAsync("open", ["-a", "Simulator"]);
     });
 
   const server = new McpServer({ name: "ios-simulator", version: "1.0.0" });
@@ -69,16 +72,16 @@ export function createServer(deps: ServerDeps = {}): McpServer {
       inputSchema: { ...deviceArg },
     },
     async ({ device }) => {
-      const dev = resolveDevice(run, device);
+      const dev = await resolveDevice(run, device);
       const file = join(tmpdir(), `sim-${Date.now()}.png`);
       try {
-        run(["simctl", "io", dev, "screenshot", file]);
-        const base64 = readFileSync(file).toString("base64");
+        await run(["simctl", "io", dev, "screenshot", file]);
+        const base64 = (await readFile(file)).toString("base64");
         return {
           content: [{ type: "image", data: base64, mimeType: "image/png" }],
         };
       } finally {
-        if (existsSync(file)) unlinkSync(file);
+        await rm(file, { force: true });
       }
     },
   );
@@ -97,8 +100,8 @@ export function createServer(deps: ServerDeps = {}): McpServer {
       },
     },
     async ({ url, device }) => {
-      const dev = resolveDevice(run, device);
-      run(["simctl", "openurl", dev, url]);
+      const dev = await resolveDevice(run, device);
+      await run(["simctl", "openurl", dev, url]);
       return { content: [{ type: "text", text: `Opened: ${url}` }] };
     },
   );
@@ -117,8 +120,8 @@ export function createServer(deps: ServerDeps = {}): McpServer {
       },
     },
     async ({ x, y, device }) => {
-      const dev = resolveDevice(run, device);
-      run(["simctl", "io", dev, "tap", String(x), String(y)]);
+      const dev = await resolveDevice(run, device);
+      await run(["simctl", "io", dev, "tap", String(x), String(y)]);
       return { content: [{ type: "text", text: `Tapped (${x}, ${y})` }] };
     },
   );
@@ -142,8 +145,8 @@ export function createServer(deps: ServerDeps = {}): McpServer {
       },
     },
     async ({ x1, y1, x2, y2, duration, device }) => {
-      const dev = resolveDevice(run, device);
-      run([
+      const dev = await resolveDevice(run, device);
+      await run([
         "simctl",
         "io",
         dev,
@@ -176,8 +179,8 @@ export function createServer(deps: ServerDeps = {}): McpServer {
       },
     },
     async ({ mode, device }) => {
-      const dev = resolveDevice(run, device);
-      run(["simctl", "ui", dev, "appearance", mode]);
+      const dev = await resolveDevice(run, device);
+      await run(["simctl", "ui", dev, "appearance", mode]);
       return { content: [{ type: "text", text: `Appearance set to ${mode}` }] };
     },
   );
@@ -213,8 +216,8 @@ export function createServer(deps: ServerDeps = {}): McpServer {
       },
     },
     async ({ device, ...opts }) => {
-      const dev = resolveDevice(run, device);
-      run(buildStatusBarArgs(dev, opts));
+      const dev = await resolveDevice(run, device);
+      await run(buildStatusBarArgs(dev, opts));
       const text = opts.clear
         ? "Status bar overrides cleared"
         : "Status bar updated";
@@ -231,7 +234,7 @@ export function createServer(deps: ServerDeps = {}): McpServer {
       inputSchema: {},
     },
     async () => {
-      const raw = run(["simctl", "list", "devices", "--json"]);
+      const raw = await run(["simctl", "list", "devices", "--json"]);
       return { content: [{ type: "text", text: formatDeviceList(raw) }] };
     },
   );
@@ -248,9 +251,9 @@ export function createServer(deps: ServerDeps = {}): McpServer {
       },
     },
     async ({ device }) => {
-      const udid = resolveDevice(run, device);
-      run(["simctl", "boot", udid]);
-      openApp();
+      const udid = await resolveDevice(run, device);
+      await run(["simctl", "boot", udid]);
+      await openApp();
       return {
         content: [{ type: "text", text: `Booted: ${device} (${udid})` }],
       };
@@ -264,8 +267,8 @@ export function createServer(deps: ServerDeps = {}): McpServer {
       inputSchema: { ...deviceArg },
     },
     async ({ device }) => {
-      const dev = resolveDevice(run, device);
-      run(["simctl", "shutdown", dev]);
+      const dev = await resolveDevice(run, device);
+      await run(["simctl", "shutdown", dev]);
       return { content: [{ type: "text", text: `Shutdown: ${dev}` }] };
     },
   );
